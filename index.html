@@ -66,6 +66,7 @@ function onResults(results) {
             const tengahAtas = landmarks[12].y;
             const manisAtas = landmarks[16].y;
             const kelingkingAtas = landmarks[20].y;
+            const tengahAtas = landmarks[12].y;
 
             // 1. Tangan Terbuka (Semua jari di atas sendinya) - "Halo / Dadah"
             if (telunjukAtas < landmarks[6].y && tengahAtas < landmarks[10].y && manisAtas < landmarks[14].y && kelingkingAtas < landmarks[18].y) {
@@ -94,7 +95,7 @@ function onResults(results) {
             // 7.fuckyou (tengah & jempol) - "bacot"
             else if +tengahAtas < landmarks[6].y && jempolAtas < landmarks[18].y {
                 speak("bacot");
-            }
+           }
         }
     }
     canvasCtx.restore();
