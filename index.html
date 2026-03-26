@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penerjemah Isyarat AI v2</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <style>
+        body { margin: 0; background: #000; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        video { transform: scaleX(-1); width: 100vw; height: 100vh; object-fit: cover; opacity: 0.3; }
+        canvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; transform: scaleX(-1); object-fit: cover; }
+        #status-container {
+            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+            width: 90%; text-align: center;
+        }
+        #status {
+            background: rgba(0, 255, 0, 0.2); padding: 20px; border-radius: 15px;
+            font-size: 28px; font-weight: bold; border: 2px solid #00ff00;
+            text-shadow: 2px 2px 4px #000;
+        }
+    </style>
+</head>
+<body>
+
+<video id="webcam" autoplay playsinline></video>
+<canvas id="output"></canvas>
+<div id="status-container">
+    <div id="status">Siap Membaca Tangan...</div>
+</div>
+
+<script>
+const video = document.getElementById('webcam');
+const canvasElement = document.getElementById('output');
+const canvasCtx = canvasElement.getContext('2d');
+const statusText = document.getElementById('status');
+
+let lastWord = "";
+let counter = 0;
+
+function speak(text) {
+    if (text !== lastWord) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'id-ID';
+        msg.rate = 1.0;
+        window.speechSynthesis.speak(msg);
+        lastWord = text;
+        statusText.innerText = text;
+        // Reset biar bisa ngomong hal yang sama lagi setelah 2 detik
+        setTimeout(() => { lastWord = ""; }, 2000);
+    }
+}
+
+function onResults(results) {
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        for (const landmarks of results.multiHandLandmarks) {
+            
+            // Titik-titik penting (Y makin kecil = makin tinggi di layar)
+            const jempolAtas = landmarks[4].y;
+            const telunjukAtas = landmarks[8].y;
+            const telunjukBawah = landmarks[6].y;
+            const tengahAtas = landmarks[12].y;
+            const manisAtas = landmarks[16].y;
+            const kelingkingAtas = landmarks[20].y;
+
+            // 1. Tangan Terbuka (Semua jari di atas sendinya) - "Halo / Dadah"
+            if (telunjukAtas < landmarks[6].y && tengahAtas < landmarks[10].y && manisAtas < landmarks[14].y && kelingkingAtas < landmarks[18].y) {
+                speak("Halo, selamat siang");
+            }
+            // 2. Cuma Telunjuk (Angka 1) - "Tunggu sebentar"
+            else if (telunjukAtas < landmarks[6].y && tengahAtas > landmarks[10].y && manisAtas > landmarks[14].y) {
+                speak("Bisa bantu saya?");
+            }
+            // 3. Telunjuk & Tengah (Peace/V) - "Terima kasih"
+            else if (telunjukAtas < landmarks[6].y && tengahAtas < landmarks[10].y && manisAtas > landmarks[14].y) {
+                speak("Terima kasih banyak");
+            }
+            // 4. Jempol & Kelingking (Shaka sign) - "Minta tolong"
+            else if (jempolAtas < landmarks[2].y && kelingkingAtas < landmarks[18].y && telunjukAtas > landmarks[6].y) {
+                speak("Saya butuh bantuan medis");
+            }
+            // 5. Kepalan Tangan - "Maaf"
+            else if (telunjukAtas > landmarks[6].y && tengahAtas > landmarks[10].y && manisAtas > landmarks[14].y && kelingkingAtas > landmarks[18].y) {
+                speak("Mohon maaf");
+            }
+            // 6. Metal Sign (Telunjuk & Kelingking) - "I Love You (Isyarat International)"
+            else if (telunjukAtas < landmarks[6].y && kelingkingAtas < landmarks[18].y && tengahAtas > landmarks[10].y) {
+                speak("Saya sayang kamu");
+            }
+        }
+    }
+    canvasCtx.restore();
+}
+
+const hands = new Hands({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.7, // Naikin dikit biar gak gampang salah deteksi
+    minTrackingConfidence: 0.7
+});
+
+hands.onResults(onResults);
+
+const camera = new Camera(video, {
+    onFrame: async () => {
+        canvasElement.width = video.videoWidth;
+        canvasElement.height = video.videoHeight;
+        await hands.send({image: video});
+    },
+    width: 1280, height: 720
+});
+camera.start();
+</script>
+</body>
+</html>
